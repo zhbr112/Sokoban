@@ -131,6 +131,7 @@ namespace Sokoban
                     // Проверяем, не выиграли ли мы после этого хода
                     CheckWinCondition();
                 }
+                else return;
             }
             movesCount++;
             UIManager.instance.UpdateMovesText(movesCount);
