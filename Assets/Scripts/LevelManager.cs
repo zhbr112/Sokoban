@@ -3,65 +3,82 @@ using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
 
-public class LevelManager : MonoBehaviour
+namespace Sokoban
 {
-    public static LevelManager instance; // Singleton для легкого доступа
-
-    public List<TextAsset> levelFiles; // Сюда перетащим все файлы уровней
-    private int currentLevelIndex = 0;
-
-    private LevelGenerator levelGenerator;
-    private GameManager gameManager;
-
-    void Awake()
+    public class LevelManager : MonoBehaviour
     {
-        if (instance == null) instance = this;
-        else Destroy(gameObject);
+        public static LevelManager instance { get; private set; } // Singleton для легкого доступа
 
-        levelGenerator = GetComponent<LevelGenerator>();
-        gameManager = GetComponent<GameManager>();
-    }
+        [SerializeField] private List<TextAsset> levelFiles; // Сюда перетащим все файлы уровней
+        private int currentLevelIndex = 0;
 
-    void Start()
-    {
-        // Загружаем первый уровень при старте
-        LoadLevel(currentLevelIndex);
-    }
-    
-    private IEnumerator LoadLevelRoutine(int levelIndex)
-    {
-        levelGenerator.GenerateLevel(levelFiles[levelIndex]);
+        private LevelGenerator levelGenerator;
+        private GameManager gameManager;
 
-        yield return null; 
-
-        gameManager.InitializeLevel();
-    }
-
-    public void LoadLevel(int levelIndex)
-    {
-        if (levelIndex >= 0 && levelIndex < levelFiles.Count)
+        void Awake()
         {
-            currentLevelIndex = levelIndex;
-            StartCoroutine(LoadLevelRoutine(currentLevelIndex));
+            if (instance == null)
+            {
+                instance = this;
+            }
+            else
+            {
+                Debug.LogWarning("Обнаружен еще один экземпляр LevelManager. Уничтожается.", gameObject);
+                Destroy(gameObject);
+            }
+
+            levelGenerator = GetComponent<LevelGenerator>();
+            gameManager = GetComponent<GameManager>();
         }
-        else
+
+        void Start()
         {
-            Debug.Log("Все уровни пройдены!");
+            // Загружаем первый уровень при старте
+            if (levelFiles != null && levelFiles.Count > 0)
+            {
+                LoadLevel(currentLevelIndex);
+            }
+            else
+            {
+                Debug.LogError("Список файлов уровней (levelFiles) не назначен в LevelManager.");
+            }
         }
-    }
 
-    public void RestartLevel()
-    {
-        LoadLevel(currentLevelIndex);
-    }
+        private IEnumerator LoadLevelRoutine(int levelIndex)
+        {
+            levelGenerator.GenerateLevel(levelFiles[levelIndex]);
 
-    public void LoadNextLevel()
-    {
-        LoadLevel(currentLevelIndex + 1);
-    }
+            yield return null;
 
-    public int GetCurrentLevelIndex()
-    {
-        return currentLevelIndex;
+            gameManager.InitializeLevel();
+        }
+
+        public void LoadLevel(int levelIndex)
+        {
+            if (levelFiles != null && levelIndex >= 0 && levelIndex < levelFiles.Count)
+            {
+                currentLevelIndex = levelIndex;
+                StartCoroutine(LoadLevelRoutine(currentLevelIndex));
+            }
+            else
+            {
+                Debug.Log("Все уровни пройдены или неверный индекс уровня!");
+            }
+        }
+
+        public void RestartLevel()
+        {
+            LoadLevel(currentLevelIndex);
+        }
+
+        public void LoadNextLevel()
+        {
+            LoadLevel(currentLevelIndex + 1);
+        }
+
+        public int GetCurrentLevelIndex()
+        {
+            return currentLevelIndex;
+        }
     }
 }
