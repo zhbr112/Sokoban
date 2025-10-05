@@ -12,10 +12,11 @@ namespace Sokoban
         private PlayerGraphics playerGraphics;
         private int movesCount;
         private float levelTimer;
+        private LevelGenerator.LevelStarThresholds starThresholds;
 
         public static bool isGamePaused = false;
 
-        public void InitializeLevel()
+        public void InitializeLevel(LevelGenerator.LevelStarThresholds thresholds)
         {
             Debug.Log("GameManager: Инициализация уровня...");
 
@@ -25,6 +26,7 @@ namespace Sokoban
             levelTimer = 0f;
             Time.timeScale = 1f;
             GameManager.isGamePaused = false;
+            starThresholds = thresholds;
 
             UIManager.instance.UpdateMovesText(movesCount);
             UIManager.instance.UpdateTimeText(levelTimer);
@@ -33,6 +35,7 @@ namespace Sokoban
 
             // Прячем меню победы через UIManager
             UIManager.instance.ShowLevelCompleteMenu(false);
+            UIManager.instance.ShowSkipLevelButton(false); // Скрываем кнопку пропуска при инициализации
 
             if (levelCompleteMenu != null)
             {
@@ -135,6 +138,7 @@ namespace Sokoban
             }
             movesCount++;
             UIManager.instance.UpdateMovesText(movesCount);
+            CheckSkipButtonCondition();
         }
 
         private bool IsWalkable(Vector2 position)
@@ -187,6 +191,7 @@ namespace Sokoban
                     boxesOnGoals++;
                 }
             }
+
             Debug.Log(boxes.Length);
             Debug.Log(goals.Length);
             Debug.Log(boxesOnGoals);
@@ -195,10 +200,37 @@ namespace Sokoban
             if (boxesOnGoals == goals.Length)
             {
                 isGameWon = true;
-                Debug.Log("ПОБЕДА!");
-                UIManager.instance.ShowLevelCompleteMenu(true);
                 GameManager.isGamePaused = true;
+
+                int stars = CalculateStars();
+                Debug.Log($"ПОБЕДА! Заработано звезд: {stars}");
+
+                UIManager.instance.ShowLevelCompleteMenu(true, stars);
+
+                // Сохраняем статистику уровня
+                int currentLevelIndex = LevelManager.instance.GetCurrentLevelIndex();
+                GameProgressionManager.instance.RecordLevelStats(currentLevelIndex, movesCount, levelTimer, stars);
             }
+        }
+
+        private void CheckSkipButtonCondition()
+        {
+            // Показываем кнопку пропуска, если ходов в 2 раза больше, чем нужно для 2 звезд
+            // и игра еще не выиграна
+            if (!isGameWon)
+            {
+                UIManager.instance.ShowSkipLevelButton(movesCount > starThresholds.TwoStars * 2);
+            }
+        }
+
+        private int CalculateStars()
+        {
+            if (movesCount <= starThresholds.ThreeStars)
+                return 3;
+            if (movesCount <= starThresholds.TwoStars)
+                return 2;
+
+            return 1;
         }
 
         public void OnRestartButtonPressed()
@@ -209,6 +241,11 @@ namespace Sokoban
         public void OnNextLevelButtonPressed()
         {
             LevelManager.instance.LoadNextLevel();
+        }
+
+        public (int moves, float time) GetCurrentStats()
+        {
+            return (movesCount, levelTimer);
         }
     }
 }

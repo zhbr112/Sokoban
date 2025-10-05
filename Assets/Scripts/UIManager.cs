@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro; // Важно для работы с TextMeshPro
+using System.Collections.Generic;
 using UnityEngine.UI; // Необходимо для работы с Button и Image
 
 namespace Sokoban
@@ -22,6 +23,19 @@ namespace Sokoban
         [Header("Menus & Panels")]
         [SerializeField] private GameObject settingsMenu;
         [SerializeField] private GameObject levelCompleteMenu;
+        [SerializeField] private Button skipLevelButton;
+
+        [Header("Level Complete Elements")]
+        [SerializeField] private List<Image> starImages; // Список компонентов Image для звезд
+        [SerializeField] private Sprite starFilledSprite; // Спрайт закрашенной звезды
+        [SerializeField] private Sprite starEmptySprite;  // Спрайт пустой звезды
+
+        [Header("Game Complete Elements")]
+        [SerializeField] private GameObject gameCompleteMenu;
+        [SerializeField] private TextMeshProUGUI totalMovesText;
+        [SerializeField] private TextMeshProUGUI totalTimeText;
+        [SerializeField] private TextMeshProUGUI totalStarsText;
+
 
         [Header("Settings Elements")]
         [SerializeField] private Button musicToggleButton;
@@ -56,6 +70,12 @@ namespace Sokoban
                 // Устанавливаем начальное значение слайдера и добавляем обработчик
                 musicVolumeSlider.value = AudioManager.instance.GetMusicVolume();
                 musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
+            }
+
+            if (skipLevelButton != null)
+            {
+                skipLevelButton.onClick.AddListener(OnSkipLevelButtonPressed);
+                skipLevelButton.gameObject.SetActive(false); // Скрываем кнопку при старте
             }
 
             // Обновляем иконку при запуске игры в соответствии с состоянием AudioManager
@@ -117,11 +137,66 @@ namespace Sokoban
             Debug.Log("Игра снята с паузы");
         }
 
-        public void ShowLevelCompleteMenu(bool show)
+        public void ShowLevelCompleteMenu(bool show, int starsEarned = 0)
         {
             if (levelCompleteMenu != null)
             {
                 levelCompleteMenu.SetActive(show);
+                ShowSkipLevelButton(false); // Скрываем кнопку пропуска, когда уровень пройден
+                if (show)
+                {
+                    UpdateStarsDisplay(starsEarned);
+                }
+            }
+        }
+
+        public void ShowGameCompleteMenu(int totalLevels)
+        {
+            if (gameCompleteMenu != null)
+            {
+                // Получаем итоговую статистику
+                var (totalMoves, totalTime, totalStars) = GameProgressionManager.instance.GetTotalStats();
+
+                // Максимальное количество звезд (по 3 на уровень)
+                int maxStars = totalLevels * 3;
+
+                // Обновляем текстовые поля
+                totalMovesText.text = $"Всего ходов: {totalMoves}";
+
+                int minutes = Mathf.FloorToInt(totalTime / 60);
+                int seconds = Mathf.FloorToInt(totalTime % 60);
+                totalTimeText.text = $"Общее время: {minutes:00}:{seconds:00}";
+
+                totalStarsText.text = $"Собрано звезд: {totalStars} / {maxStars}";
+
+                gameCompleteMenu.SetActive(true);
+                ShowSkipLevelButton(false);
+            }
+        }
+
+        private void UpdateStarsDisplay(int starsEarned)
+        {
+            if (starImages == null || starImages.Count == 0)
+            {
+                Debug.LogWarning("Список изображений звезд (starImages) не назначен в UIManager.");
+                return;
+            }
+
+            // Проходим по всем изображениям звезд и устанавливаем нужный спрайт
+            for (int i = 0; i < starImages.Count; i++)
+            {
+                // Если индекс меньше количества заработанных звезд, ставим "заполненную", иначе "пустую"
+                starImages[i].sprite = (i < starsEarned) ? starFilledSprite : starEmptySprite;
+            }
+        }
+
+        public void ShowSkipLevelButton(bool show)
+        {
+            if (skipLevelButton != null && skipLevelButton.gameObject.activeSelf != show)
+            {
+                // Показываем кнопку, только если уровень не пройден
+                bool canShow = show && !levelCompleteMenu.activeSelf;
+                skipLevelButton.gameObject.SetActive(canShow);
             }
         }
 
@@ -136,7 +211,7 @@ namespace Sokoban
 
             // "Иначе (если это собранная игра), выполнить этот код"
 #else
-                Application.Quit();
+            Application.Quit();
 #endif
         }
 
@@ -147,6 +222,11 @@ namespace Sokoban
         {
             AudioManager.instance.ToggleMusic();
             UpdateMusicVisuals();
+        }
+
+        private void OnSkipLevelButtonPressed()
+        {
+            LevelManager.instance.SkipLevel();
         }
 
         private void OnMusicVolumeChanged(float volume)

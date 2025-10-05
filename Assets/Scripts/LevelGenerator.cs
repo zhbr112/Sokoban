@@ -30,14 +30,29 @@ namespace Sokoban
 
         private Transform levelContainer;
 
-        public void GenerateLevel(TextAsset levelFile)
+        // Структура для хранения порогов для звезд
+        public struct LevelStarThresholds
+        {
+            public int ThreeStars;
+            public int TwoStars;
+        }
+
+        public LevelStarThresholds GenerateLevel(TextAsset levelFile)
         {
             ClearLevel(); // Сначала очищаем старый уровень
 
             // Создаем контейнер для порядка в иерархии
             levelContainer = new GameObject("LevelContainer").transform;
 
-            List<string> levelRows = new List<string>(levelFile.text.Split('\n'));
+            List<string> allLines = new List<string>(levelFile.text.Split('\n'));
+            LevelStarThresholds thresholds = new LevelStarThresholds { ThreeStars = int.MaxValue, TwoStars = int.MaxValue };
+
+            // 1. Разделяем карту и данные о звездах
+            int separatorIndex = allLines.FindIndex(line => line.Trim() == "---");
+            List<string> levelRows = (separatorIndex == -1) ? allLines : allLines.Take(separatorIndex).ToList();
+
+            // Парсим пороги для звезд
+            ParseStarThresholds(allLines, separatorIndex, ref thresholds);
 
             // 2. Определяем размеры уровня
             int levelHeight = levelRows.Count;
@@ -81,6 +96,26 @@ namespace Sokoban
                             Instantiate(playerPrefab, position, Quaternion.identity);
                             break;
                     }
+                }
+            }
+            return thresholds;
+        }
+
+        private void ParseStarThresholds(List<string> allLines, int separatorIndex, ref LevelStarThresholds thresholds)
+        {
+            if (separatorIndex != -1 && allLines.Count > separatorIndex + 1)
+            {
+                string thresholdLine = allLines[separatorIndex + 1].Trim();
+                string[] parts = thresholdLine.Split(',');
+
+                if (parts.Length == 2 && int.TryParse(parts[0], out int threeStars) && int.TryParse(parts[1], out int twoStars))
+                {
+                    thresholds.ThreeStars = threeStars;
+                    thresholds.TwoStars = twoStars;
+                }
+                else
+                {
+                    Debug.LogWarning("Не удалось прочитать пороги для звезд. Проверьте формат строки после '---'. Ожидается 'число,число'.");
                 }
             }
         }

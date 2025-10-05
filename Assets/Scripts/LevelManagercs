@@ -47,11 +47,11 @@ namespace Sokoban
 
         private IEnumerator LoadLevelRoutine(int levelIndex)
         {
-            currentThresholds = levelGenerator.GenerateLevel(levelFiles[levelIndex]);
+            levelGenerator.GenerateLevel(levelFiles[levelIndex]);
 
             yield return null;
 
-            gameManager.InitializeLevel(currentThresholds);
+            gameManager.InitializeLevel();
         }
 
         public void LoadLevel(int levelIndex)
@@ -74,33 +74,7 @@ namespace Sokoban
 
         public void LoadNextLevel()
         {
-            int nextLevelIndex = currentLevelIndex + 1;
-            if (nextLevelIndex < levelFiles.Count)
-            {
-                LoadLevel(nextLevelIndex);
-            }
-            else
-            {
-                // Все уровни пройдены! Показываем экран с общей статистикой.
-                Debug.Log("Все уровни пройдены! Показываем финальный экран.");
-                UIManager.instance.ShowGameCompleteMenu(levelFiles.Count);
-            }
-        }
-
-        public void SkipLevel()
-        {
-            // Получаем текущую статистику
-            var (moves, time) = gameManager.GetCurrentStats();
-
-            // Записываем текущие ходы и время, но с 0 звезд
-            int finalMoves = moves;
-            float finalTime = time;
-            int stars = 0;
-
-            // Записываем "штрафную" статистику
-            GameProgressionManager.instance.RecordLevelStats(currentLevelIndex, finalMoves, finalTime, stars);
-
-            LoadNextLevel();
+            LoadLevel(currentLevelIndex + 1);
         }
 
         public int GetCurrentLevelIndex()
