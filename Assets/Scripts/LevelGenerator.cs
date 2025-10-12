@@ -57,7 +57,7 @@ namespace Sokoban
             // 2. Определяем размеры уровня
             int levelHeight = levelRows.Count;
             // Находим длину самой длинной строки для определения ширины
-            int levelWidth = levelRows.Max(row => row.Length);
+            int levelWidth = levelRows.Max(row => row.Length-1);
 
             // 3. Рассчитываем смещение (offset)
             // Мы хотим, чтобы центр уровня (width/2, -height/2) оказался в точке (0,0).

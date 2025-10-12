@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: cd83c50150e522d4baff5d81d8ded816
+guid: e586f2fd94859a2468ee7a1f28dce4ef
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -3095886911710049607
-    second: StarEmpty_0
+      213: 3906120096216358436
+    second: BavkgroundLevelComplite_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: StarEmpty_0
+      name: BavkgroundLevelComplite_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 400
-        height: 385
+        width: 320
+        height: 174
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9bacdbaa1433905d0800000000000000
-      internalID: -3095886911710049607
+      spriteID: 42e9df03883553630800000000000000
+      internalID: 3906120096216358436
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      StarEmpty_0: -3095886911710049607
+      BavkgroundLevelComplite_0: 3906120096216358436
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

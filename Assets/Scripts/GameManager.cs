@@ -5,9 +5,7 @@ using System.Linq;
 namespace Sokoban
 {
     public class GameManager : MonoBehaviour
-    {
-        public GameObject levelCompleteMenu;
-        public bool isGameWon = false;
+    {        public bool isGameWon = false;
         private GameObject player;
         private PlayerGraphics playerGraphics;
         private int movesCount;
@@ -36,11 +34,6 @@ namespace Sokoban
             // Прячем меню победы через UIManager
             UIManager.instance.ShowLevelCompleteMenu(false);
             UIManager.instance.ShowSkipLevelButton(false); // Скрываем кнопку пропуска при инициализации
-
-            if (levelCompleteMenu != null)
-            {
-                levelCompleteMenu.SetActive(false);
-            }
 
             // Находим НОВЫЕ объекты на сцене
             player = GameObject.FindGameObjectWithTag("Player");

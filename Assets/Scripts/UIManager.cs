@@ -38,11 +38,18 @@ namespace Sokoban
 
 
         [Header("Settings Elements")]
-        [SerializeField] private Button musicToggleButton;
+        [SerializeField] private Button openMusicMenuButton; // Бывшая musicToggleButton
         [SerializeField] private Image musicButtonImage; // Компонент Image на кнопке
         [SerializeField] private Sprite musicOnSprite;   // Спрайт для состояния "Музыка ВКЛ"
         [SerializeField] private Sprite musicOffSprite;  // Спрайт для состояния "Музыка ВЫКЛ"
         [SerializeField] private Slider musicVolumeSlider; // Слайдер для громкости
+
+        [Header("Music Selection Menu")]
+        [SerializeField] private GameObject musicSelectionMenu;
+        [SerializeField] private Button musicTrackButtonPrefab; // Префаб кнопки для выбора трека
+        [SerializeField] private Transform musicTrackButtonsContainer; // Контейнер, куда будут добавляться кнопки
+        private List<Button> musicTrackButtons = new List<Button>(); // Список для хранения созданных кнопок
+
 
         void Awake()
         {
@@ -60,9 +67,9 @@ namespace Sokoban
         void Start()
         {
             // Добавляем обработчик нажатия на кнопку из кода
-            if (musicToggleButton != null)
+            if (openMusicMenuButton != null)
             {
-                musicToggleButton.onClick.AddListener(OnMusicTogglePressed);
+                openMusicMenuButton.onClick.AddListener(OnOpenMusicMenuPressed);
             }
 
             if (musicVolumeSlider != null)
@@ -77,6 +84,9 @@ namespace Sokoban
                 skipLevelButton.onClick.AddListener(OnSkipLevelButtonPressed);
                 skipLevelButton.gameObject.SetActive(false); // Скрываем кнопку при старте
             }
+
+            // Генерируем кнопки выбора музыки
+            PopulateMusicSelectionMenu();
 
             // Обновляем иконку при запуске игры в соответствии с состоянием AudioManager
             UpdateMusicVisuals();
@@ -123,6 +133,20 @@ namespace Sokoban
             }
         }
 
+        public void ToggleMusicSelectionMenu(bool show)
+        {
+            if (musicSelectionMenu != null)
+            {
+                musicSelectionMenu.SetActive(show);
+
+                if (show)
+                {
+                    // При открытии меню обновляем подсветку кнопок
+                    UpdateMusicButtonHighlight();
+                }
+            }
+        }
+
         private void PauseGame()
         {
             Time.timeScale = 0f; // Останавливаем время
@@ -161,13 +185,13 @@ namespace Sokoban
                 int maxStars = totalLevels * 3;
 
                 // Обновляем текстовые поля
-                totalMovesText.text = $"Всего ходов: {totalMoves}";
+                totalMovesText.text = $"{totalMoves}";
 
                 int minutes = Mathf.FloorToInt(totalTime / 60);
                 int seconds = Mathf.FloorToInt(totalTime % 60);
-                totalTimeText.text = $"Общее время: {minutes:00}:{seconds:00}";
+                totalTimeText.text = $"{minutes:00}:{seconds:00}";
 
-                totalStarsText.text = $"Собрано звезд: {totalStars} / {maxStars}";
+                totalStarsText.text = $"{totalStars} / {maxStars}";
 
                 gameCompleteMenu.SetActive(true);
                 ShowSkipLevelButton(false);
@@ -218,11 +242,11 @@ namespace Sokoban
         /// <summary>
         /// Вызывается при нажатии на кнопку включения/выключения музыки.
         /// </summary>
-        private void OnMusicTogglePressed()
-        {
-            AudioManager.instance.ToggleMusic();
-            UpdateMusicVisuals();
+        private void OnOpenMusicMenuPressed()
+        {         
+            ToggleMusicSelectionMenu(!musicSelectionMenu.activeSelf);
         }
+
 
         private void OnSkipLevelButtonPressed()
         {
@@ -246,6 +270,77 @@ namespace Sokoban
             {
                 // Устанавливаем значение слайдера без вызова события, чтобы избежать зацикливания
                 musicVolumeSlider.SetValueWithoutNotify(AudioManager.instance.GetMusicVolume());
+            }
+        }
+
+        private void PopulateMusicSelectionMenu()
+        {
+            if (musicTrackButtonPrefab == null || musicTrackButtonsContainer == null || AudioManager.instance.MusicTracks == null)
+            {
+                Debug.LogWarning("Не назначены префаб кнопки, контейнер или список треков для меню выбора музыки.");
+                return;
+            }
+
+            // Очищаем список перед заполнением
+            musicTrackButtons.Clear();
+            // Также очищаем старые кнопки из контейнера
+            // Очищаем старые кнопки, если они есть
+            foreach (Transform child in musicTrackButtonsContainer)
+            {
+                Destroy(child.gameObject);
+            }
+
+            var musicTracks = AudioManager.instance.MusicTracks;
+            for (int i = 0; i < musicTracks.Length; i++)
+            {
+                Button buttonInstance = Instantiate(musicTrackButtonPrefab, musicTrackButtonsContainer);
+                TextMeshProUGUI buttonText = buttonInstance.GetComponentInChildren<TextMeshProUGUI>();
+                if (buttonText != null)
+                {
+                    buttonText.text = musicTracks[i].name; // Используем имя файла клипа
+                }
+
+                int trackIndex = i; // Важно для замыкания
+                buttonInstance.onClick.AddListener(() => {
+                    AudioManager.instance.ChangeMusicTrack(trackIndex);
+                    UpdateMusicButtonHighlight(); // Обновляем подсветку сразу после клика
+                });
+                buttonInstance.gameObject.name = $"TrackButton_{i}_{musicTracks[i].name}";
+                musicTrackButtons.Add(buttonInstance); // Добавляем кнопку в список
+            }
+        }
+
+        /// <summary>
+        /// Обновляет внешний вид кнопок выбора музыки, подсвечивая текущий трек.
+        /// </summary>
+        private void UpdateMusicButtonHighlight()
+        {
+            int currentTrackIndex = AudioManager.instance.GetCurrentTrackIndex();
+
+            // Определяем цвета для подсветки и для обычного состояния
+            Color highlightColor = new Color(0.7f, 1f, 0.7f, 1f); // Светло-зеленый
+            Color defaultColor = Color.white;
+
+            for (int i = 0; i < musicTrackButtons.Count; i++)
+            {
+                // Получаем ColorBlock для настройки цветов кнопки в разных состояниях
+                var colors = musicTrackButtons[i].colors;
+
+                if (i == currentTrackIndex)
+                {
+                    // Это активный трек. Делаем его цвет выделенным.
+                    // Мы меняем и normalColor, и selectedColor, чтобы подсветка оставалась
+                    // видна, даже если кнопка осталась "выбранной" после клика.
+                    colors.normalColor = highlightColor;
+                    colors.selectedColor = highlightColor;
+                }
+                else
+                {
+                    // Это неактивный трек. Возвращаем стандартный цвет.
+                    colors.normalColor = defaultColor;
+                    colors.selectedColor = defaultColor;
+                }
+                musicTrackButtons[i].colors = colors; // Применяем измененные цвета
             }
         }
     }
