@@ -34,7 +34,14 @@ namespace Sokoban
 
         void Start()
         {
-            // Загружаем первый уровень при старте
+            // Мы больше не загружаем уровень здесь.
+            // Загрузка начнется после успешной аутентификации,
+            // когда UIManager вызовет StartGame().
+        }
+
+        public void StartGame()
+        {
+            // Этот метод вызывается после успешного входа
             if (levelFiles != null && levelFiles.Count > 0)
             {
                 LoadLevel(currentLevelIndex);

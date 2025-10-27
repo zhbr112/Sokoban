@@ -10,7 +10,7 @@ namespace Sokoban
 
         void Start()
         {
-            gameManager = FindObjectOfType<GameManager>();
+            gameManager = FindFirstObjectByType<GameManager>();
         }
 
         // Этот метод будет вызван автоматически компонентом Player Input

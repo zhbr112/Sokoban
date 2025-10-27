@@ -36,6 +36,11 @@ namespace Sokoban
         [SerializeField] private TextMeshProUGUI totalTimeText;
         [SerializeField] private TextMeshProUGUI totalStarsText;
 
+        [Header("Auth Elements")]
+        [SerializeField] private GameObject authMenu;
+        [SerializeField] private Button guestModeButton; // Кнопка для гостевого режима
+        [SerializeField] private GameObject hudPanel; // Панель с ходами, временем и т.д.
+
 
         [Header("Settings Elements")]
         [SerializeField] private Button openMusicMenuButton; // Бывшая musicToggleButton
@@ -43,6 +48,13 @@ namespace Sokoban
         [SerializeField] private Sprite musicOnSprite;   // Спрайт для состояния "Музыка ВКЛ"
         [SerializeField] private Sprite musicOffSprite;  // Спрайт для состояния "Музыка ВЫКЛ"
         [SerializeField] private Slider musicVolumeSlider; // Слайдер для громкости
+
+        [Header("Leaderboard Elements")]
+        [SerializeField] private GameObject leaderboardPanel;
+        [SerializeField] private Button openLeaderboardButton;
+        [SerializeField] private Button closeLeaderboardButton;
+        [SerializeField] private GameObject leaderboardEntryPrefab; // Префаб строки в таблице
+        [SerializeField] private Transform leaderboardContentContainer; // Контейнер для строк
 
         [Header("Music Selection Menu")]
         [SerializeField] private GameObject musicSelectionMenu;
@@ -85,11 +97,31 @@ namespace Sokoban
                 skipLevelButton.gameObject.SetActive(false); // Скрываем кнопку при старте
             }
 
+            if (openLeaderboardButton != null)
+            {
+                openLeaderboardButton.onClick.AddListener(OnOpenLeaderboardPressed);
+            }
+
+            if (closeLeaderboardButton != null)
+            {
+                closeLeaderboardButton.onClick.AddListener(() => ToggleLeaderboardPanel(false));
+            }
+
             // Генерируем кнопки выбора музыки
             PopulateMusicSelectionMenu();
 
             // Обновляем иконку при запуске игры в соответствии с состоянием AudioManager
             UpdateMusicVisuals();
+
+            if (guestModeButton != null)
+            {
+                guestModeButton.onClick.AddListener(AuthManager.instance.OnGuestModeButtonClicked);
+            }
+
+            // Показываем меню аутентификации при старте
+            authMenu.SetActive(true);
+            hudPanel.SetActive(false);
+            levelCompleteMenu.SetActive(false);
         }
 
         // --- Методы для обновления HUD ---
@@ -129,9 +161,19 @@ namespace Sokoban
                 {
                     // Снимаем игру с паузы
                     ResumeGame();
+                    ToggleMusicSelectionMenu(false);
                 }
             }
         }
+
+        public void ToggleLeaderboardPanel(bool show)
+        {
+            if (leaderboardPanel != null)
+            {
+                leaderboardPanel.SetActive(show);
+            }
+        }
+
 
         public void ToggleMusicSelectionMenu(bool show)
         {
@@ -194,6 +236,9 @@ namespace Sokoban
                 totalStarsText.text = $"{totalStars} / {maxStars}";
 
                 gameCompleteMenu.SetActive(true);
+
+                // Отправляем результаты на сервер (AuthManager сам решит, отправлять или нет)
+                AuthManager.instance.TrySubmitGameResult(totalStars, totalMoves, (int)totalTime);
                 ShowSkipLevelButton(false);
             }
         }
@@ -247,6 +292,12 @@ namespace Sokoban
             ToggleMusicSelectionMenu(!musicSelectionMenu.activeSelf);
         }
 
+        private void OnOpenLeaderboardPressed()
+        {
+            // Запрашиваем данные и показываем панель
+            AuthManager.instance.OnFetchLeaderboardClicked();
+            ToggleLeaderboardPanel(true);
+        }
 
         private void OnSkipLevelButtonPressed()
         {
@@ -310,6 +361,66 @@ namespace Sokoban
             }
         }
 
+        /// <summary>
+        /// Вызывается из AuthManager после успешного входа.
+        /// </summary>
+        public void OnLoginSuccess()
+        {
+            authMenu.SetActive(false); // Скрываем меню входа
+            hudPanel.SetActive(true);  // Показываем игровой интерфейс
+            LevelManager.instance.StartGame(); // Запускаем загрузку первого уровня
+        }
+
+        /// <summary>
+        /// Заполняет UI таблицы лидеров данными, полученными с сервера.
+        /// </summary>
+        public void PopulateLeaderboard(LeaderboardEntryDto[] entries)
+        {
+            if (leaderboardContentContainer == null || leaderboardEntryPrefab == null)
+            {
+                Debug.LogError("Не назначены элементы UI для таблицы лидеров в UIManager!");
+                return;
+            }
+
+            // Очищаем старые записи
+            foreach (Transform child in leaderboardContentContainer)
+            {
+                Destroy(child.gameObject);
+            }
+
+            // Создаем заголовок таблицы
+            GameObject headerGO = Instantiate(leaderboardEntryPrefab, leaderboardContentContainer);
+            LeaderboardEntryUI headerUI = headerGO.GetComponent<LeaderboardEntryUI>();
+            if (headerUI != null)
+            {
+                headerUI.SetHeader();
+            }
+            else
+            {
+                // Если на префабе нет скрипта, удаляем созданный объект и выводим ошибку
+                Debug.LogError($"На префабе {leaderboardEntryPrefab.name} отсутствует компонент LeaderboardEntryUI. Заголовок не может быть создан.");
+                Destroy(headerGO);
+            }
+
+
+            // Создаем новые записи
+            for (int i = 0; i < entries.Length; i++)
+            {
+                GameObject entryGO = Instantiate(leaderboardEntryPrefab, leaderboardContentContainer);
+                LeaderboardEntryUI entryUI = entryGO.GetComponent<LeaderboardEntryUI>();
+
+                if (entryUI != null)
+                {
+                    // Передаем данные в компонент, который сам заполнит свои поля
+                    entryUI.SetData(i + 1, entries[i]);
+                }
+                else
+                {
+                    Debug.LogError($"На префабе {leaderboardEntryPrefab.name} отсутствует компонент LeaderboardEntryUI. Пожалуйста, добавьте его.");
+                    Destroy(entryGO); // Удаляем некорректный объект
+                }
+            }
+        }
         /// <summary>
         /// Обновляет внешний вид кнопок выбора музыки, подсвечивая текущий трек.
         /// </summary>

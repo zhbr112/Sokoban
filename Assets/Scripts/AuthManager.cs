@@ -1,0 +1,277 @@
+using UnityEngine;
+using UnityEngine.Networking;
+using System.Collections;
+using TMPro; // Для TextMeshPro
+
+namespace Sokoban
+{
+    // Вспомогательные классы для сериализации в JSON
+    [System.Serializable]
+    public class UserCredentials
+    {
+        public string username;
+        public string password;
+    }
+
+    [System.Serializable]
+    public class AuthResponse
+    {
+        public string token;
+    }
+
+    [System.Serializable]
+    public class GameResultDto
+    {
+        public int TotalStars;
+        public int TotalMoves;
+        public int TotalTime; // В секундах
+    }
+
+    [System.Serializable]
+    public class LeaderboardEntryDto
+    {
+        public string username;
+        public int totalStars;
+        public int totalMoves;
+        public int totalTime;
+    }
+
+    /// <summary>
+    /// Вспомогательный класс-обертка, так как JsonUtility не может парсить JSON-массив из корня.
+    /// </summary>
+    [System.Serializable]
+    public class LeaderboardResponse
+    {
+        public LeaderboardEntryDto[] entries;
+    }
+
+    public class AuthManager : MonoBehaviour
+    {
+        public static AuthManager instance { get; private set; }
+
+        // Ссылки на элементы UI, которые нужно перетащить в Inspector
+        public TMP_InputField usernameInput;
+        public TMP_InputField passwordInput;
+        public TextMeshProUGUI statusText;
+
+        // Адрес вашего API
+        // Для теста на локальной машине используйте http://localhost:5000 (или порт вашего API)
+        private string apiBaseUrl = "https://sokoban.1zq.ru";
+
+        // Статическая переменная для хранения токена между сценами
+        public static string AuthToken { get; private set; }
+        public static bool IsGuestMode { get; private set; } = false; // Флаг гостевого режима
+
+        void Awake()
+        {
+            if (instance == null)
+            {
+                instance = this;
+            }
+            else
+            {
+                Debug.LogWarning("Обнаружен еще один экземпляр AuthManager. Уничтожается.", gameObject);
+                Destroy(gameObject);
+            }
+        }
+
+        // --- Публичные методы для кнопок (чтобы вызвать из Inspector) ---
+        public void OnRegisterButtonClicked()
+        {
+            statusText.text = "Registering...";
+            StartCoroutine(RegisterCoroutine());
+        }
+
+        public void OnLoginButtonClicked()
+        {
+            statusText.text = "Logging in...";
+            StartCoroutine(LoginCoroutine());
+        }
+
+        public void OnGuestModeButtonClicked()
+        {
+            IsGuestMode = true;
+            AuthToken = null; // Убедимся, что токен не используется в гостевом режиме
+            statusText.text = "Playing as Guest. Results will not be saved.";
+            Debug.Log("Guest mode activated.");
+            UIManager.instance.OnLoginSuccess(); // Запускаем игру
+        }
+
+        public void OnFetchLeaderboardClicked()
+        {
+            statusText.text = "Loading leaderboard...";
+            StartCoroutine(FetchLeaderboardCoroutine());
+        }
+
+        // --- Корутины для отправки веб-запросов ---
+
+        private IEnumerator RegisterCoroutine()
+        {
+            UserCredentials credentials = new UserCredentials
+            {
+                username = usernameInput.text,
+                password = passwordInput.text
+            };
+            string json = JsonUtility.ToJson(credentials);
+
+            using (UnityWebRequest request = new UnityWebRequest(apiBaseUrl + "/register", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    statusText.text = "Registration successful! You can now log in.";
+                    Debug.Log("Registration successful!");
+                }
+                else
+                {
+                    statusText.text = $"Error: {request.responseCode} - {request.downloadHandler.text}";
+                    Debug.LogError($"Registration failed: {request.error} | {request.downloadHandler.text}");
+                }
+            }
+        }
+
+        private IEnumerator LoginCoroutine()
+        {
+            UserCredentials credentials = new UserCredentials
+            {
+                username = usernameInput.text,
+                password = passwordInput.text
+            };
+            string json = JsonUtility.ToJson(credentials);
+
+            using (UnityWebRequest request = new UnityWebRequest(apiBaseUrl + "/login", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    string responseJson = request.downloadHandler.text;
+                    AuthResponse authResponse = JsonUtility.FromJson<AuthResponse>(responseJson);
+
+                    AuthToken = authResponse.token;
+                    statusText.text = "Login successful!";
+                    Debug.Log($"Login successful! Token: {AuthToken}");
+
+                    // Сообщаем UIManager, что можно начинать игру
+                    UIManager.instance.OnLoginSuccess();
+
+                    // Пример запроса к защищенному эндпоинту
+                    StartCoroutine(GetSecureDataCoroutine());
+                }
+                else
+                {
+                    statusText.text = $"Error: {request.responseCode} - {request.downloadHandler.text}";
+                    Debug.LogError($"Login failed: {request.error} | {request.downloadHandler.text}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Пытается отправить результаты игры на сервер, если игрок авторизован и не в гостевом режиме.
+        /// </summary>
+        public void TrySubmitGameResult(int totalStars, int totalMoves, int totalTime)
+        {
+            if (IsGuestMode)
+            {
+                Debug.Log("В гостевом режиме результаты игры не сохраняются.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(AuthToken))
+            {
+                Debug.LogWarning("Невозможно отправить результаты: пользователь не авторизован.");
+                return;
+            }
+
+            StartCoroutine(SubmitGameResultCoroutine(totalStars, totalMoves, totalTime));
+        }
+
+        private IEnumerator SubmitGameResultCoroutine(int totalStars, int totalMoves, int totalTime)
+        {
+            GameResultDto gameResult = new GameResultDto { TotalStars = totalStars, TotalMoves = totalMoves, TotalTime = totalTime };
+            string json = JsonUtility.ToJson(gameResult);
+
+            using (UnityWebRequest request = new UnityWebRequest(apiBaseUrl + "/leaderboard/submit", "POST"))
+            {
+                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.SetRequestHeader("Authorization", "Bearer " + AuthToken);
+
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    Debug.Log("Результаты игры успешно отправлены на сервер!");
+                }
+                else
+                {
+                    Debug.LogError($"Ошибка при отправке результатов игры: {request.responseCode} - {request.downloadHandler.text}");
+                }
+            }
+        }
+
+        private IEnumerator FetchLeaderboardCoroutine()
+        {
+            using (UnityWebRequest request = UnityWebRequest.Get(apiBaseUrl + "/leaderboard"))
+            {
+                request.downloadHandler = new DownloadHandlerBuffer();
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    string jsonResponse = request.downloadHandler.text;
+                    // JsonUtility не может парсить массив из корня, поэтому "оборачиваем" его в объект.
+                    string wrappedJson = "{\"entries\":" + jsonResponse + "}";
+                    LeaderboardResponse leaderboardData = JsonUtility.FromJson<LeaderboardResponse>(wrappedJson);
+
+                    if (leaderboardData != null && leaderboardData.entries != null)
+                    {
+                        Debug.Log($"Загружено {leaderboardData.entries.Length} записей в таблице лидеров.");
+                        UIManager.instance.PopulateLeaderboard(leaderboardData.entries);
+                    }
+                    statusText.text = ""; // Очищаем статус
+                }
+                else
+                {
+                    statusText.text = $"Error: {request.responseCode} - {request.downloadHandler.text}";
+                    Debug.LogError($"Ошибка при загрузке таблицы лидеров: {request.error} | {request.downloadHandler.text}");
+                }
+            }
+        }
+
+        // Пример запроса к защищенному ресурсу
+        private IEnumerator GetSecureDataCoroutine()
+        {
+            using (UnityWebRequest request = UnityWebRequest.Get(apiBaseUrl + "/securedata"))
+            {
+                // !!! ВАЖНЕЙШИЙ ШАГ: Добавляем токен в заголовок Authorization
+                request.SetRequestHeader("Authorization", "Bearer " + AuthToken);
+
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    Debug.Log("Secure data response: " + request.downloadHandler.text);
+                    statusText.text += "\n" + request.downloadHandler.text;
+                }
+                else
+                {
+                    Debug.LogError("Failed to get secure data: " + request.error);
+                }
+            }
+        }
+    }
+}
