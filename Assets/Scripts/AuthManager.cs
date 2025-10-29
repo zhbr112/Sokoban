@@ -78,13 +78,13 @@ namespace Sokoban
         // --- Публичные методы для кнопок (чтобы вызвать из Inspector) ---
         public void OnRegisterButtonClicked()
         {
-            statusText.text = "Registering...";
+            statusText.text = "Регистрация...";
             StartCoroutine(RegisterCoroutine());
         }
 
         public void OnLoginButtonClicked()
         {
-            statusText.text = "Logging in...";
+            statusText.text = "Вход...";
             StartCoroutine(LoginCoroutine());
         }
 
@@ -92,14 +92,14 @@ namespace Sokoban
         {
             IsGuestMode = true;
             AuthToken = null; // Убедимся, что токен не используется в гостевом режиме
-            statusText.text = "Playing as Guest. Results will not be saved.";
+            statusText.text = "Гостевой режим. Результаты не будут сохранены.";
             Debug.Log("Guest mode activated.");
             UIManager.instance.OnLoginSuccess(); // Запускаем игру
         }
 
         public void OnFetchLeaderboardClicked()
         {
-            statusText.text = "Loading leaderboard...";
+            statusText.text = "Загрузка таблицы лидеров...";
             StartCoroutine(FetchLeaderboardCoroutine());
         }
 
@@ -125,13 +125,21 @@ namespace Sokoban
 
                 if (request.result == UnityWebRequest.Result.Success)
                 {
-                    statusText.text = "Registration successful! You can now log in.";
+                    statusText.text = "Регистрация успешна! Теперь вы можете войти.";
                     Debug.Log("Registration successful!");
                 }
                 else
                 {
-                    statusText.text = $"Error: {request.responseCode} - {request.downloadHandler.text}";
-                    Debug.LogError($"Registration failed: {request.error} | {request.downloadHandler.text}");
+                    string serverMessage = request.downloadHandler.text;
+                    Debug.LogError($"Registration failed: {request.error} | {serverMessage}");
+
+                    // Проверяем, содержит ли ответ сервера сообщение о существующем пользователе
+                    if (serverMessage != null && serverMessage.Contains("already exists"))
+                    {
+                        statusText.text = "Пользователь с таким именем уже существует.";
+                    }
+                    else
+                        statusText.text = "Ошибка регистрации. Попробуйте позже.";
                 }
             }
         }
@@ -160,7 +168,7 @@ namespace Sokoban
                     AuthResponse authResponse = JsonUtility.FromJson<AuthResponse>(responseJson);
 
                     AuthToken = authResponse.token;
-                    statusText.text = "Login successful!";
+                    statusText.text = "Вход выполнен успешно!";
                     Debug.Log($"Login successful! Token: {AuthToken}");
 
                     // Сообщаем UIManager, что можно начинать игру
@@ -171,8 +179,8 @@ namespace Sokoban
                 }
                 else
                 {
-                    statusText.text = $"Error: {request.responseCode} - {request.downloadHandler.text}";
-                    Debug.LogError($"Login failed: {request.error} | {request.downloadHandler.text}");
+                    statusText.text = "Неверный логин или пароль.";
+                    Debug.LogError($"Login failed: {request.error} | {request.downloadHandler.text}"); // В логах оставляем полную информацию для отладки
                 }
             }
         }
@@ -246,7 +254,7 @@ namespace Sokoban
                 }
                 else
                 {
-                    statusText.text = $"Error: {request.responseCode} - {request.downloadHandler.text}";
+                    statusText.text = "Ошибка загрузки таблицы лидеров.";
                     Debug.LogError($"Ошибка при загрузке таблицы лидеров: {request.error} | {request.downloadHandler.text}");
                 }
             }
@@ -265,7 +273,7 @@ namespace Sokoban
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     Debug.Log("Secure data response: " + request.downloadHandler.text);
-                    statusText.text += "\n" + request.downloadHandler.text;
+                    // statusText.text += "\n" + request.downloadHandler.text; // Больше не выводим это пользователю
                 }
                 else
                 {
