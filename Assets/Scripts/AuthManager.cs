@@ -90,11 +90,21 @@ namespace Sokoban
 
         public void OnGuestModeButtonClicked()
         {
+            StartAsGuest();
+        }
+
+        /// <summary>
+        /// Запускает игру в гостевом режиме.
+        /// Может быть вызван из разных мест, например, из главного меню.
+        /// </summary>
+        public void StartAsGuest()
+        {
             IsGuestMode = true;
             AuthToken = null; // Убедимся, что токен не используется в гостевом режиме
             statusText.text = "Гостевой режим. Результаты не будут сохранены.";
             Debug.Log("Guest mode activated.");
-            UIManager.instance.OnLoginSuccess(); // Запускаем игру
+            // Сообщаем UIManager, что можно начинать игру
+            UIManager.instance.OnLoginSuccess();
         }
 
         public void OnFetchLeaderboardClicked()

@@ -63,5 +63,14 @@ namespace Sokoban
         {
             return (levelStats.Values.Sum(s => s.moves), levelStats.Values.Sum(s => s.time), levelStats.Values.Sum(s => s.stars));
         }
+
+        /// <summary>
+        /// Сбрасывает всю сохраненную статистику по уровням.
+        /// </summary>
+        public void ResetProgression()
+        {
+            levelStats.Clear();
+            Debug.Log("Прогресс игрока сброшен.");
+        }
     }
 }

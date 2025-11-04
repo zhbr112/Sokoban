@@ -30,14 +30,23 @@ namespace Sokoban
             UIManager.instance.UpdateTimeText(levelTimer);
             // Сообщаем UIManager номер уровня (берем из LevelManager)
             UIManager.instance.UpdateLevelText(LevelManager.instance.GetCurrentLevelIndex() + 1);
+            
+            // Показываем подсказку на первом уровне
+            if (LevelManager.instance.GetCurrentLevelIndex() == 0)
+            {
+                UIManager.instance.ShowTutorialPanel(true);
+            }
+            else
+            {
+                UIManager.instance.ShowTutorialPanel(false);
+            }
 
             // Прячем меню победы через UIManager
             UIManager.instance.ShowLevelCompleteMenu(false);
             UIManager.instance.ShowSkipLevelButton(false); // Скрываем кнопку пропуска при инициализации
 
-            // Находим НОВЫЕ объекты на сцене
-            player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
+            player = GameObject.FindGameObjectWithTag("Player"); // Находим игрока на сцене
+            if (player != null) // Проверяем, что игрок найден
             {
                 playerGraphics = player.GetComponent<PlayerGraphics>();
             }
@@ -46,7 +55,6 @@ namespace Sokoban
                 Debug.LogError("Инициализация провалена: Игрок не найден!");
                 return; // Прерываем, если игрока нет
             }
-            Debug.Log("GameManager: Инициализация прошла успешно");
         }
 
         void Update()
@@ -55,21 +63,28 @@ namespace Sokoban
             if (!isGameWon && !isGamePaused)
             {
                 levelTimer += Time.deltaTime;
-                UIManager.instance.UpdateTimeText(levelTimer);
+                // Добавляем проверку, чтобы убедиться, что UIManager уже существует
+                if (UIManager.instance != null)
+                {
+                    UIManager.instance.UpdateTimeText(levelTimer);
+                }
             }
         }
 
         // Этот метод будет вызываться из PlayerController
         public void MovePlayer(Vector2 direction)
         {
+            // Если игра на паузе, выиграна, или нет игрока - выходим
             if (isGameWon || player == null || playerGraphics == null)
             {
-                Debug.Log(isGameWon);
-                Debug.Log(player == null);
-                Debug.Log(playerGraphics == null);
-                Debug.Log("GameManager: ошибка");
                 return;
             }
+
+            // Скрываем подсказку при первом движении
+            if (UIManager.instance.IsTutorialPanelVisible()) {
+                UIManager.instance.ShowTutorialPanel(false);
+            }
+
             if (player == null)
             {
                 player = GameObject.FindGameObjectWithTag("Player");
@@ -119,18 +134,21 @@ namespace Sokoban
                 // Если за ящиком пусто или цель - двигаем ящик и игрока
                 if (hitBehindBox.All(x => x.CompareTag("Goal") || x.CompareTag("Floor")))
                 {
+                    GameObject movedBox = hit.First(x => x.CompareTag("Box")).gameObject;
                     // Двигаем ящик
-                    hit.First(x => x.CompareTag("Box")).transform.position = boxTargetPos;
+                    movedBox.transform.position = boxTargetPos;
                     // Двигаем игрока
                     player.transform.position = targetPos;
 
-                    // Проверяем, не выиграли ли мы после этого хода
+                    // Если не в тупике, проверяем, не выиграли ли мы.
+                    // Этот вызов должен быть здесь, а не внутри условия выше.
                     CheckWinCondition();
                 }
                 else return;
             }
             movesCount++;
             UIManager.instance.UpdateMovesText(movesCount);
+
             CheckSkipButtonCondition();
         }
 

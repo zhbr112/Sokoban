@@ -44,6 +44,9 @@ namespace Sokoban
             // Этот метод вызывается после успешного входа
             if (levelFiles != null && levelFiles.Count > 0)
             {
+                // Сбрасываем прогресс предыдущей игры перед началом новой
+                GameProgressionManager.instance.ResetProgression();
+                currentLevelIndex = 0; // Начинаем всегда с первого уровня
                 LoadLevel(currentLevelIndex);
             }
             else

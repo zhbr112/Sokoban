@@ -36,14 +36,29 @@ namespace Sokoban
         [SerializeField] private TextMeshProUGUI totalTimeText;
         [SerializeField] private TextMeshProUGUI totalStarsText;
 
+
+        [Header("Main Menu Elements")]
+        [SerializeField] private GameObject mainMenuPanel;
+        [SerializeField] private Button startGameButton;
+        [SerializeField] private Button openAuthButton;
+        [SerializeField] private Button openSettingsButton;
+        [SerializeField] private Button quitGameButton; // Новая кнопка выхода из игры
+
+        [Header("About Panel Elements")]
+        [SerializeField] private GameObject aboutPanel;
+        [SerializeField] private Button openAboutButton;
+        [SerializeField] private Button closeAboutButton;
+
         [Header("Auth Elements")]
         [SerializeField] private GameObject authMenu;
         [SerializeField] private Button guestModeButton; // Кнопка для гостевого режима
+        [SerializeField] private Button closeAuthButton; // Кнопка для закрытия меню авторизации
         [SerializeField] private GameObject hudPanel; // Панель с ходами, временем и т.д.
 
 
         [Header("Settings Elements")]
         [SerializeField] private Button openMusicMenuButton; // Бывшая musicToggleButton
+        [SerializeField] private Button returnToMenuButton; // Кнопка "Выход в меню" из настроек
         [SerializeField] private Image musicButtonImage; // Компонент Image на кнопке
         [SerializeField] private Sprite musicOnSprite;   // Спрайт для состояния "Музыка ВКЛ"
         [SerializeField] private Sprite musicOffSprite;  // Спрайт для состояния "Музыка ВЫКЛ"
@@ -55,13 +70,18 @@ namespace Sokoban
         [SerializeField] private Button closeLeaderboardButton;
         [SerializeField] private GameObject leaderboardEntryPrefab; // Префаб строки в таблице
         [SerializeField] private Transform leaderboardContentContainer; // Контейнер для строк
+        [SerializeField] private GameObject leaderboardSeparatorPrefab; // Префаб для линии-разделителя
 
         [Header("Music Selection Menu")]
         [SerializeField] private GameObject musicSelectionMenu;
         [SerializeField] private Button musicTrackButtonPrefab; // Префаб кнопки для выбора трека
         [SerializeField] private Transform musicTrackButtonsContainer; // Контейнер, куда будут добавляться кнопки
-        private List<Button> musicTrackButtons = new List<Button>(); // Список для хранения созданных кнопок
+        [SerializeField] private Button restartGameButton; // Кнопка "Начать заново" на экране завершения
 
+        [Header("Tutorial Elements")]
+        [SerializeField] private GameObject tutorialPanel; // Панель с текстом-подсказкой
+        private List<Button> musicTrackButtons = new List<Button>(); // Список для хранения созданных кнопок
+        private bool isLeaderboardGridSetup = false; // Флаг, чтобы настроить сетку только один раз
 
         void Awake()
         {
@@ -76,8 +96,49 @@ namespace Sokoban
             }
         }
 
+        void OnDestroy()
+        {
+            // Хорошая практика - отписываться от событий при уничтожении объекта
+        }
+
         void Start()
         {
+            // --- Обработчики для нового главного меню ---
+            if (startGameButton != null)
+            {
+                startGameButton.onClick.AddListener(OnStartGamePressed);
+            }
+            if (openAuthButton != null)
+            {
+                openAuthButton.onClick.AddListener(OnOpenAuthPressed);
+            }
+            if (openSettingsButton != null)
+            {
+                // Эта кнопка просто открывает меню настроек
+                openSettingsButton.onClick.AddListener(() => ToggleSettingsMenu(true));
+            }
+
+            if (quitGameButton != null)
+            {
+                quitGameButton.onClick.AddListener(QuitGame);
+            }
+
+            if (returnToMenuButton != null)
+            {
+                returnToMenuButton.onClick.AddListener(ReturnToMainMenu);
+            }
+
+            // --- Обработчики для меню "Об игре" ---
+            if (openAboutButton != null)
+            {
+                openAboutButton.onClick.AddListener(() => ToggleAboutPanel(true));
+            }
+
+            if (closeAboutButton != null)
+            {
+                closeAboutButton.onClick.AddListener(() => ToggleAboutPanel(false));
+            }
+
             // Добавляем обработчик нажатия на кнопку из кода
             if (openMusicMenuButton != null)
             {
@@ -107,6 +168,11 @@ namespace Sokoban
                 closeLeaderboardButton.onClick.AddListener(() => ToggleLeaderboardPanel(false));
             }
 
+            if (restartGameButton != null)
+            {
+                restartGameButton.onClick.AddListener(OnRestartGamePressed);
+            }
+
             // Генерируем кнопки выбора музыки
             PopulateMusicSelectionMenu();
 
@@ -118,12 +184,21 @@ namespace Sokoban
                 guestModeButton.onClick.AddListener(AuthManager.instance.OnGuestModeButtonClicked);
             }
 
-            // Показываем меню аутентификации при старте
-            authMenu.SetActive(true);
+            if (closeAuthButton != null)
+            {
+                closeAuthButton.onClick.AddListener(CloseAuthMenu);
+            }
+
+            // При старте показываем главное меню, остальное скрываем
+            mainMenuPanel.SetActive(true);
+            authMenu.SetActive(false);
             hudPanel.SetActive(false);
             levelCompleteMenu.SetActive(false);
+            gameCompleteMenu.SetActive(false);
+            settingsMenu.SetActive(false);
+            if (tutorialPanel != null) tutorialPanel.SetActive(false);
+            if (aboutPanel != null) aboutPanel.SetActive(false);
         }
-
         // --- Методы для обновления HUD ---
 
         public void UpdateLevelText(int levelNumber)
@@ -158,8 +233,7 @@ namespace Sokoban
                     PauseGame();
                 }
                 else
-                {
-                    // Снимаем игру с паузы
+                {   // Снимаем игру с паузы
                     ResumeGame();
                     ToggleMusicSelectionMenu(false);
                 }
@@ -174,6 +248,17 @@ namespace Sokoban
             }
         }
 
+        private void ToggleAboutPanel(bool show)
+        {
+            if (aboutPanel != null)
+            {
+                aboutPanel.SetActive(show);
+            }
+            if (mainMenuPanel != null)
+            {
+                mainMenuPanel.SetActive(!show);
+            }
+        }
 
         public void ToggleMusicSelectionMenu(bool show)
         {
@@ -197,7 +282,8 @@ namespace Sokoban
         }
 
         private void ResumeGame()
-        {
+        {   
+            // Снимаем игру с паузы
             Time.timeScale = 1f; // Возвращаем нормальный ход времени
             GameManager.isGamePaused = false; // Сообщаем о снятии с паузы
             Debug.Log("Игра снята с паузы");
@@ -269,6 +355,28 @@ namespace Sokoban
             }
         }
 
+        /// <summary>
+        /// Возвращает игрока в главное меню из любого другого меню (например, из настроек).
+        /// </summary>
+        public void ReturnToMainMenu()
+        {
+            // Снимаем игру с паузы, если она была
+            ResumeGame();
+
+            // Скрываем все игровые панели и меню
+            settingsMenu.SetActive(false);
+            hudPanel.SetActive(false);
+            authMenu.SetActive(false);
+            levelCompleteMenu.SetActive(false);
+            gameCompleteMenu.SetActive(false);
+            leaderboardPanel.SetActive(false);
+            if (aboutPanel != null) aboutPanel.SetActive(false);
+            if (tutorialPanel != null) tutorialPanel.SetActive(false);
+
+            // Показываем главное меню
+            mainMenuPanel.SetActive(true);
+        }
+
         public void QuitGame()
         {
             Debug.Log("Попытка выхода из игры...");
@@ -284,6 +392,40 @@ namespace Sokoban
 #endif
         }
 
+        // --- Новые обработчики кнопок главного меню ---
+
+        private void OnStartGamePressed()
+        {
+            // Запускаем игру в гостевом режиме
+            AuthManager.instance.StartAsGuest();
+        }
+
+        private void OnOpenAuthPressed()
+        {
+            // Скрываем главное меню и показываем меню авторизации
+            mainMenuPanel.SetActive(false);
+            authMenu.SetActive(true);
+        }
+
+        private void OnRestartGamePressed()
+        {
+            // Скрываем все меню
+            gameCompleteMenu.SetActive(false);
+            hudPanel.SetActive(false);
+
+            // Показываем снова главное меню
+            mainMenuPanel.SetActive(true);
+        }
+
+        /// <summary>
+        /// Закрывает меню авторизации и возвращает в главное меню.
+        /// </summary>
+        private void CloseAuthMenu()
+        {
+            authMenu.SetActive(false);
+            mainMenuPanel.SetActive(true);
+        }
+
         /// <summary>
         /// Вызывается при нажатии на кнопку включения/выключения музыки.
         /// </summary>
@@ -295,6 +437,12 @@ namespace Sokoban
         private void OnOpenLeaderboardPressed()
         {
             // Запрашиваем данные и показываем панель
+            // Настраиваем сетку при первом открытии
+            if (!isLeaderboardGridSetup)
+            {
+                //SetupLeaderboardGrid();
+                isLeaderboardGridSetup = true;
+            }
             AuthManager.instance.OnFetchLeaderboardClicked();
             ToggleLeaderboardPanel(true);
         }
@@ -366,6 +514,7 @@ namespace Sokoban
         /// </summary>
         public void OnLoginSuccess()
         {
+            mainMenuPanel.SetActive(false); // Также скрываем главное меню
             authMenu.SetActive(false); // Скрываем меню входа
             hudPanel.SetActive(true);  // Показываем игровой интерфейс
             LevelManager.instance.StartGame(); // Запускаем загрузку первого уровня
@@ -402,6 +551,15 @@ namespace Sokoban
                 Destroy(headerGO);
             }
 
+            // Добавляем разделитель после заголовка
+            if (leaderboardSeparatorPrefab != null)
+            {
+                Instantiate(leaderboardSeparatorPrefab, leaderboardContentContainer);
+            }
+            else
+            {
+                Debug.LogWarning("Префаб разделителя (leaderboardSeparatorPrefab) не назначен в UIManager.");
+            }
 
             // Создаем новые записи
             for (int i = 0; i < entries.Length; i++)
@@ -419,7 +577,32 @@ namespace Sokoban
                     Debug.LogError($"На префабе {leaderboardEntryPrefab.name} отсутствует компонент LeaderboardEntryUI. Пожалуйста, добавьте его.");
                     Destroy(entryGO); // Удаляем некорректный объект
                 }
+
+                // Добавляем разделитель после каждой записи
+                if (leaderboardSeparatorPrefab != null)
+                {
+                    Instantiate(leaderboardSeparatorPrefab, leaderboardContentContainer);
+                }
             }
+        }
+
+        /// <summary>
+        /// Показывает или скрывает панель с подсказкой.
+        /// </summary>
+        public void ShowTutorialPanel(bool show)
+        {
+            if (tutorialPanel != null)
+            {
+                tutorialPanel.SetActive(show);
+            }
+        }
+
+        /// <summary>
+        /// Проверяет, видна ли панель с подсказкой.
+        /// </summary>
+        public bool IsTutorialPanelVisible()
+        {
+            return tutorialPanel != null && tutorialPanel.activeSelf;
         }
         /// <summary>
         /// Обновляет внешний вид кнопок выбора музыки, подсвечивая текущий трек.
@@ -431,6 +614,14 @@ namespace Sokoban
             // Определяем цвета для подсветки и для обычного состояния
             Color highlightColor = new Color(0.7f, 1f, 0.7f, 1f); // Светло-зеленый
             Color defaultColor = Color.white;
+            // Создаем два шаблона ColorBlock для подсветки и для обычного состояния
+            ColorBlock highlightedColors = musicTrackButtons[0].colors; // Берем за основу существующий
+            highlightedColors.normalColor = new Color(0.7f, 1f, 0.7f, 1f); // Светло-зеленый
+            highlightedColors.selectedColor = highlightedColors.normalColor;
+
+            ColorBlock defaultColors = musicTrackButtons[0].colors; // Берем за основу существующий
+            defaultColors.normalColor = Color.white;
+            defaultColors.selectedColor = defaultColors.normalColor;
 
             for (int i = 0; i < musicTrackButtons.Count; i++)
             {
@@ -444,12 +635,14 @@ namespace Sokoban
                     // видна, даже если кнопка осталась "выбранной" после клика.
                     colors.normalColor = highlightColor;
                     colors.selectedColor = highlightColor;
+                    musicTrackButtons[i].colors = highlightedColors;
                 }
                 else
                 {
                     // Это неактивный трек. Возвращаем стандартный цвет.
                     colors.normalColor = defaultColor;
                     colors.selectedColor = defaultColor;
+                    musicTrackButtons[i].colors = defaultColors;
                 }
                 musicTrackButtons[i].colors = colors; // Применяем измененные цвета
             }
