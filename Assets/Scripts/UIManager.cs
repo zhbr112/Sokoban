@@ -371,6 +371,7 @@ namespace Sokoban
             gameCompleteMenu.SetActive(false);
             leaderboardPanel.SetActive(false);
             if (aboutPanel != null) aboutPanel.SetActive(false);
+            if (musicSelectionMenu != null) musicSelectionMenu.SetActive(false);
             if (tutorialPanel != null) tutorialPanel.SetActive(false);
 
             // Показываем главное меню
