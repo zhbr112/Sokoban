@@ -28,10 +28,10 @@ namespace Sokoban
 
             UIManager.instance.UpdateMovesText(movesCount);
             UIManager.instance.UpdateTimeText(levelTimer);
-            // Сообщаем UIManager номер уровня (берем из LevelManager)
+
             UIManager.instance.UpdateLevelText(LevelManager.instance.GetCurrentLevelIndex() + 1);
             
-            // Показываем подсказку на первом уровне
+
             if (LevelManager.instance.GetCurrentLevelIndex() == 0)
             {
                 UIManager.instance.ShowTutorialPanel(true);
@@ -41,29 +41,28 @@ namespace Sokoban
                 UIManager.instance.ShowTutorialPanel(false);
             }
 
-            // Прячем меню победы через UIManager
             UIManager.instance.ShowLevelCompleteMenu(false);
-            UIManager.instance.ShowSkipLevelButton(false); // Скрываем кнопку пропуска при инициализации
+            UIManager.instance.ShowSkipLevelButton(false);
 
-            player = GameObject.FindGameObjectWithTag("Player"); // Находим игрока на сцене
-            if (player != null) // Проверяем, что игрок найден
+            player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
             {
                 playerGraphics = player.GetComponent<PlayerGraphics>();
             }
             else
             {
                 Debug.LogError("Инициализация провалена: Игрок не найден!");
-                return; // Прерываем, если игрока нет
+                return;
             }
         }
 
         void Update()
         {
-            // Таймер работает только если игра не выиграна
+
             if (!isGameWon && !isGamePaused)
             {
                 levelTimer += Time.deltaTime;
-                // Добавляем проверку, чтобы убедиться, что UIManager уже существует
+
                 if (UIManager.instance != null)
                 {
                     UIManager.instance.UpdateTimeText(levelTimer);
@@ -71,16 +70,14 @@ namespace Sokoban
             }
         }
 
-        // Этот метод будет вызываться из PlayerController
         public void MovePlayer(Vector2 direction)
         {
-            // Если игра на паузе, выиграна, или нет игрока - выходим
+
             if (isGameWon || player == null || playerGraphics == null)
             {
                 return;
             }
 
-            // Скрываем подсказку при первом движении
             if (UIManager.instance.IsTutorialPanelVisible()) {
                 UIManager.instance.ShowTutorialPanel(false);
             }
@@ -88,20 +85,19 @@ namespace Sokoban
             if (player == null)
             {
                 player = GameObject.FindGameObjectWithTag("Player");
-                // Если и сейчас не нашли, то выходим, чтобы избежать ошибки
+
                 if (player == null)
                 {
                     Debug.LogError("Игрок с тегом 'Player' не найден на сцене!");
-                    return; // Прерываем выполнение метода
+                    return;
                 }
             }
             playerGraphics.SetDirectionalSprite(direction);
-            // Текущая позиция игрока
+
             Vector2 currentPos = player.transform.position;
-            // Целевая позиция игрока
+
             Vector2 targetPos = currentPos + direction;
 
-            // 1. Проверяем, что находится в целевой клетке
             Collider2D[] hit = Physics2D.OverlapPointAll(targetPos);
 
             if (!IsWalkable(targetPos))
@@ -109,20 +105,19 @@ namespace Sokoban
                 return;
             }
 
-            // Если там пусто (или цель) - двигаемся
             if (hit.All(x => x.CompareTag("Goal") || x.CompareTag("Floor")))
             {
                 player.transform.position = targetPos;
             }
-            // Если там стена - ничего не делаем
+
             else if (hit.Any(x => x.CompareTag("Wall")))
             {
                 return;
             }
-            // Если там ящик - самая сложная логика
+
             else if (hit.Any(x => x.CompareTag("Box")))
             {
-                // Определяем позицию за ящиком
+
                 Vector2 boxTargetPos = targetPos + direction;
                 Collider2D[] hitBehindBox = Physics2D.OverlapPointAll(boxTargetPos);
 
@@ -131,17 +126,14 @@ namespace Sokoban
                     return;
                 }
 
-                // Если за ящиком пусто или цель - двигаем ящик и игрока
                 if (hitBehindBox.All(x => x.CompareTag("Goal") || x.CompareTag("Floor")))
                 {
                     GameObject movedBox = hit.First(x => x.CompareTag("Box")).gameObject;
-                    // Двигаем ящик
+
                     movedBox.transform.position = boxTargetPos;
-                    // Двигаем игрока
+
                     player.transform.position = targetPos;
 
-                    // Если не в тупике, проверяем, не выиграли ли мы.
-                    // Этот вызов должен быть здесь, а не внутри условия выше.
                     CheckWinCondition();
                 }
                 else return;
@@ -154,46 +146,45 @@ namespace Sokoban
 
         private bool IsWalkable(Vector2 position)
         {
-            // Получаем все коллайдеры в точке
+
             Collider2D[] colliders = Physics2D.OverlapPointAll(position);
 
-            // Проверяем, есть ли среди них хотя бы один с тегом "Floor"
             foreach (var col in colliders)
             {
                 if (col.CompareTag("Floor"))
                 {
-                    return true; // Найдена ходибельная поверхность
+                    return true;
                 }
             }
 
-            return false; // Если цикл завершился, ходибельных поверхностей нет
+            return false;
         }
 
         void CheckWinCondition()
         {
-            // Находим все цели
+
             GameObject[] goals = GameObject.FindGameObjectsWithTag("Goal");
-            // Находим все ящики
+
             GameObject[] boxes = GameObject.FindGameObjectsWithTag("Box");
 
-            if (goals.Length == 0) return; // Нет целей - нечего проверять
+            if (goals.Length == 0) return;
 
             int boxesOnGoals = 0;
 
             foreach (var box in boxes)
             {
-                // Получаем ВСЕ коллайдеры в точке, где стоит ящик
+
                 Collider2D[] colliders = Physics2D.OverlapPointAll(box.transform.position);
 
                 bool isOnGoal = false;
-                // Проверяем каждый найденный коллайдер
+
                 foreach (var col in colliders)
                 {
                     if (col.CompareTag("Goal"))
                     {
-                        // Если хотя бы один из них - это цель, значит ящик на месте
+
                         isOnGoal = true;
-                        break; // Выходим из внутреннего цикла, дальше проверять не нужно
+                        break;
                     }
                 }
 
@@ -207,7 +198,7 @@ namespace Sokoban
             Debug.Log(goals.Length);
             Debug.Log(boxesOnGoals);
             Debug.Log("");
-            // Если количество ящиков на целях равно общему количеству целей
+
             if (boxesOnGoals == goals.Length)
             {
                 isGameWon = true;
@@ -218,7 +209,6 @@ namespace Sokoban
 
                 UIManager.instance.ShowLevelCompleteMenu(true, stars);
 
-                // Сохраняем статистику уровня
                 int currentLevelIndex = LevelManager.instance.GetCurrentLevelIndex();
                 GameProgressionManager.instance.RecordLevelStats(currentLevelIndex, movesCount, levelTimer, stars);
             }
@@ -226,8 +216,7 @@ namespace Sokoban
 
         private void CheckSkipButtonCondition()
         {
-            // Показываем кнопку пропуска, если ходов в 2 раза больше, чем нужно для 2 звезд
-            // и игра еще не выиграна
+
             if (!isGameWon)
             {
                 UIManager.instance.ShowSkipLevelButton(movesCount > starThresholds.TwoStars * 2);

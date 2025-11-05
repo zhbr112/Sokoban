@@ -7,9 +7,9 @@ namespace Sokoban
 {
     public class LevelManager : MonoBehaviour
     {
-        public static LevelManager instance { get; private set; } // Singleton для легкого доступа
+        public static LevelManager instance { get; private set; }
 
-        [SerializeField] private List<TextAsset> levelFiles; // Сюда перетащим все файлы уровней
+        [SerializeField] private List<TextAsset> levelFiles;
         private int currentLevelIndex = 0;
         private LevelGenerator.LevelStarThresholds currentThresholds;
 
@@ -34,19 +34,17 @@ namespace Sokoban
 
         void Start()
         {
-            // Мы больше не загружаем уровень здесь.
-            // Загрузка начнется после успешной аутентификации,
-            // когда UIManager вызовет StartGame().
+
         }
 
         public void StartGame()
         {
-            // Этот метод вызывается после успешного входа
+
             if (levelFiles != null && levelFiles.Count > 0)
             {
-                // Сбрасываем прогресс предыдущей игры перед началом новой
+
                 GameProgressionManager.instance.ResetProgression();
-                currentLevelIndex = 0; // Начинаем всегда с первого уровня
+                currentLevelIndex = 0;
                 LoadLevel(currentLevelIndex);
             }
             else
@@ -91,7 +89,7 @@ namespace Sokoban
             }
             else
             {
-                // Все уровни пройдены! Показываем экран с общей статистикой.
+
                 Debug.Log("Все уровни пройдены! Показываем финальный экран.");
                 UIManager.instance.ShowGameCompleteMenu(levelFiles.Count);
             }
@@ -99,15 +97,13 @@ namespace Sokoban
 
         public void SkipLevel()
         {
-            // Получаем текущую статистику
+
             var (moves, time) = gameManager.GetCurrentStats();
 
-            // Записываем текущие ходы и время, но с 0 звезд
             int finalMoves = moves;
             float finalTime = time;
             int stars = 0;
 
-            // Записываем "штрафную" статистику
             GameProgressionManager.instance.RecordLevelStats(currentLevelIndex, finalMoves, finalTime, stars);
 
             LoadNextLevel();

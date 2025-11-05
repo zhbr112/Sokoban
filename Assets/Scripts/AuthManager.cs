@@ -1,11 +1,11 @@
 using UnityEngine;
 using UnityEngine.Networking;
 using System.Collections;
-using TMPro; // Для TextMeshPro
+using TMPro;
 
 namespace Sokoban
 {
-    // Вспомогательные классы для сериализации в JSON
+
     [System.Serializable]
     public class UserCredentials
     {
@@ -24,7 +24,7 @@ namespace Sokoban
     {
         public int TotalStars;
         public int TotalMoves;
-        public int TotalTime; // В секундах
+        public int TotalTime;
     }
 
     [System.Serializable]
@@ -36,9 +36,6 @@ namespace Sokoban
         public int totalTime;
     }
 
-    /// <summary>
-    /// Вспомогательный класс-обертка, так как JsonUtility не может парсить JSON-массив из корня.
-    /// </summary>
     [System.Serializable]
     public class LeaderboardResponse
     {
@@ -49,18 +46,14 @@ namespace Sokoban
     {
         public static AuthManager instance { get; private set; }
 
-        // Ссылки на элементы UI, которые нужно перетащить в Inspector
         public TMP_InputField usernameInput;
         public TMP_InputField passwordInput;
         public TextMeshProUGUI statusText;
 
-        // Адрес вашего API
-        // Для теста на локальной машине используйте http://localhost:5000 (или порт вашего API)
         private string apiBaseUrl = "https://sokoban.1zq.ru";
 
-        // Статическая переменная для хранения токена между сценами
         public static string AuthToken { get; private set; }
-        public static bool IsGuestMode { get; private set; } = false; // Флаг гостевого режима
+        public static bool IsGuestMode { get; private set; } = false;
 
         void Awake()
         {
@@ -75,7 +68,6 @@ namespace Sokoban
             }
         }
 
-        // --- Публичные методы для кнопок (чтобы вызвать из Inspector) ---
         public void OnRegisterButtonClicked()
         {
             statusText.text = "Регистрация...";
@@ -93,17 +85,13 @@ namespace Sokoban
             StartAsGuest();
         }
 
-        /// <summary>
-        /// Запускает игру в гостевом режиме.
-        /// Может быть вызван из разных мест, например, из главного меню.
-        /// </summary>
         public void StartAsGuest()
         {
             IsGuestMode = true;
-            AuthToken = null; // Убедимся, что токен не используется в гостевом режиме
+            AuthToken = null;
             statusText.text = "Гостевой режим. Результаты не будут сохранены.";
             Debug.Log("Guest mode activated.");
-            // Сообщаем UIManager, что можно начинать игру
+
             UIManager.instance.OnLoginSuccess();
         }
 
@@ -112,8 +100,6 @@ namespace Sokoban
             statusText.text = "Загрузка таблицы лидеров...";
             StartCoroutine(FetchLeaderboardCoroutine());
         }
-
-        // --- Корутины для отправки веб-запросов ---
 
         private IEnumerator RegisterCoroutine()
         {
@@ -143,7 +129,6 @@ namespace Sokoban
                     string serverMessage = request.downloadHandler.text;
                     Debug.LogError($"Registration failed: {request.error} | {serverMessage}");
 
-                    // Проверяем, содержит ли ответ сервера сообщение о существующем пользователе
                     if (serverMessage != null && serverMessage.Contains("already exists"))
                     {
                         statusText.text = "Пользователь с таким именем уже существует.";
@@ -181,23 +166,18 @@ namespace Sokoban
                     statusText.text = "Вход выполнен успешно!";
                     Debug.Log($"Login successful! Token: {AuthToken}");
 
-                    // Сообщаем UIManager, что можно начинать игру
                     UIManager.instance.OnLoginSuccess();
 
-                    // Пример запроса к защищенному эндпоинту
                     StartCoroutine(GetSecureDataCoroutine());
                 }
                 else
                 {
                     statusText.text = "Неверный логин или пароль.";
-                    Debug.LogError($"Login failed: {request.error} | {request.downloadHandler.text}"); // В логах оставляем полную информацию для отладки
+                    Debug.LogError($"Login failed: {request.error} | {request.downloadHandler.text}");
                 }
             }
         }
 
-        /// <summary>
-        /// Пытается отправить результаты игры на сервер, если игрок авторизован и не в гостевом режиме.
-        /// </summary>
         public void TrySubmitGameResult(int totalStars, int totalMoves, int totalTime)
         {
             if (IsGuestMode)
@@ -251,7 +231,7 @@ namespace Sokoban
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     string jsonResponse = request.downloadHandler.text;
-                    // JsonUtility не может парсить массив из корня, поэтому "оборачиваем" его в объект.
+
                     string wrappedJson = "{\"entries\":" + jsonResponse + "}";
                     LeaderboardResponse leaderboardData = JsonUtility.FromJson<LeaderboardResponse>(wrappedJson);
 
@@ -260,7 +240,7 @@ namespace Sokoban
                         Debug.Log($"Загружено {leaderboardData.entries.Length} записей в таблице лидеров.");
                         UIManager.instance.PopulateLeaderboard(leaderboardData.entries);
                     }
-                    statusText.text = ""; // Очищаем статус
+                    statusText.text = "";
                 }
                 else
                 {
@@ -270,12 +250,11 @@ namespace Sokoban
             }
         }
 
-        // Пример запроса к защищенному ресурсу
         private IEnumerator GetSecureDataCoroutine()
         {
             using (UnityWebRequest request = UnityWebRequest.Get(apiBaseUrl + "/securedata"))
             {
-                // !!! ВАЖНЕЙШИЙ ШАГ: Добавляем токен в заголовок Authorization
+
                 request.SetRequestHeader("Authorization", "Bearer " + AuthToken);
 
                 yield return request.SendWebRequest();
@@ -283,7 +262,7 @@ namespace Sokoban
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     Debug.Log("Secure data response: " + request.downloadHandler.text);
-                    // statusText.text += "\n" + request.downloadHandler.text; // Больше не выводим это пользователю
+
                 }
                 else
                 {
